@@ -1,8 +1,5 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/logo.png" />
-    <img src="assets/logo.png" alt="Pronuncy logo" width="120" />
-  </picture>
+  <img src="assets/logo.png" alt="Pronuncy logo" width="120" />
   <h1 align="center">Pronuncy</h1>
   <p align="center"><em>Your personal English pronunciation coach. Private, offline, free.</em></p>
   <p align="center">完全本地的英语发音教练 — 无需联网，无需付费，即开即用。</p>
