@@ -116,7 +116,7 @@ cd backend && uv run uvicorn app.main:app --reload --port 8000
 cd frontend && npm run dev
 ```
 
-Open **http://localhost:3000**, type a sentence, hit record, and see your phoneme-by-phoneme breakdown.
+Open **http://localhost:3000**, type a sentence, hit record, and see your phoneme-by-phoneme breakdown. / 打开浏览器，输入句子，点击录音，即可看到逐音素评估结果。
 
 ---
 
@@ -198,7 +198,7 @@ Response:
 | Google Pronunciation | ❌ Cloud only | ❌ Black-box score | ❌ | ✅ |
 | Praat (academic) | ✅ Local | ⚠️ Manual analysis | ✅ | ✅ |
 
-Pronuncy sits in a sweet spot: **academic-grade analysis** (IPA phonemes + forced alignment) with a **consumer-friendly UI** (record a sentence, get instant color-coded feedback).
+Pronuncy sits in a sweet spot: **academic-grade analysis** (IPA phonemes + forced alignment) with a **consumer-friendly UI** (record a sentence, get instant color-coded feedback). / Pronuncy 找到了学术与易用的平衡点：**学术级的 IPA 音素分析** + 精准对齐，搭配 **消费级 UI**（录一句话，秒出彩色反馈）。
 
 ---
 
@@ -238,7 +238,7 @@ pronuncy/
 docker-compose up
 ```
 
-Backend on `:8000`, frontend on `:3000`. Model cache volumes are mounted so you don't re-download on rebuild.
+Backend on `:8000`, frontend on `:3000`. Model cache volumes are mounted so you don't re-download on rebuild. / 后端运行在 `:8000`，前端在 `:3000`。模型缓存挂载为 volume，重建容器无需重新下载。
 
 ---
 
@@ -259,39 +259,39 @@ cd frontend && npm run build    # type-check + production build
 
 ## ⚠️ Caveats / 注意事项
 
-- **Phoneme detection via transcription** — Pronuncy detects mispronunciations by comparing what Whisper *heard* (as text) against what you *meant* to say. If you mispronounce "world" slightly but Whisper still hears "world", the phoneme-level score stays high. Gross mispronunciations (where Whisper transcribes a different word) are reliably caught.
-- **First-run download** — ~560MB of models are downloaded on first use. A fast internet connection is recommended.
-- **English only** — The pipeline is tuned for English. Other languages are not supported yet.
+- **Phoneme detection via transcription** — Pronuncy detects mispronunciations by comparing what Whisper *heard* (as text) against what you *meant* to say. If you mispronounce "world" slightly but Whisper still hears "world", the phoneme-level score stays high. Gross mispronunciations (where Whisper transcribes a different word) are reliably caught. / Pronuncy 通过比对 Whisper 听到的文字与目标文字来检测发音问题。如果轻微读错但 Whisper 仍识别正确，音素评分会偏高；明显读错（Whisper 识别为不同单词）则会被准确捕获。
+- **First-run download** — ~560MB of models are downloaded on first use. A fast internet connection is recommended. / 首次运行需下载约 560MB 模型文件，建议用快速网络。
+- **English only** — The pipeline is tuned for English. Other languages are not supported yet. / 目前仅支持英语，其他语言尚未适配。
 
 ---
 
 ## 🗺 Roadmap / 路线图
 
-### ✅ v0.1 — Hello World (done)
-Basic recording → Allosaurus phoneme recognition → Levenshtein alignment → score + playback.
+### ✅ v0.1 — Hello World（已完成）
+Basic recording → Allosaurus phoneme recognition → Levenshtein alignment → score + playback. / 基础录音 → 音素识别 → 对齐评分 → 回放。
 
-### ✅ v0.2 — Accurate Alignment (done)
-Replaced Allosaurus with **WhisperX** (faster-whisper + wav2vec2 forced alignment). Transcription accuracy jumped from ~70% to ~95%. Word-level and phoneme-level timestamps are now frame-accurate.
+### ✅ v0.2 — Accurate Alignment（已完成）
+Replaced Allosaurus with **WhisperX** (faster-whisper + wav2vec2 forced alignment). Transcription accuracy jumped from ~70% to ~95%. Word-level and phoneme-level timestamps are now frame-accurate. / 将 Allosaurus 替换为 **WhisperX**（faster-whisper + wav2vec2 强制对齐），识别准确率从 ~70% 提升至 ~95%，单词和音素级别的时间戳达到帧级精度。
 
-### ✅ v0.3 — Acoustic Layer (done)
-- **Acoustic Quality Score** — F1/F2 formants for vowels, spectral centroid for fricatives, F0 + duration + energy. Compared against Peterson & Barney native speaker reference values.
-- **Accent Knowledge Base** — Rule-based matching of L1→English transfer patterns. First profile: `zh-CN` (12 common Chinese→English patterns with bilingual tips).
+### ✅ v0.3 — Acoustic Layer（已完成）
+- **Acoustic Quality Score** — F1/F2 formants for vowels, spectral centroid for fricatives, F0 + duration + energy. Compared against Peterson & Barney native speaker reference values. / 声学质量评分：元音 F1/F2 共振峰、擦音频谱质心、基频 F0 + 时长 + 能量，与 Peterson & Barney 母语者参考值对比。
+- **Accent Knowledge Base** — Rule-based matching of L1→English transfer patterns. First profile: `zh-CN` (12 common Chinese→English patterns with bilingual tips). / 口音知识库：基于规则的 L1→英语迁移模式匹配，首个配置 `zh-CN`（12 种中文→英语常见迁移模式，含中英双语建议）。
 
-### 🚧 v0.4 — Smart Feedback (next)
+### 🚧 v0.4 — Smart Feedback（下一步）
 
-| Feature | Description |
+| Feature / 功能 | Description / 说明 |
 |:---|:---|
-| 🤖 **Local LLM** | Ollama (llama3.2 3B or qwen2.5 7B) to generate personalized paragraph feedback — not just "your /θ/ needs work" but "as a Mandarin speaker, you're substituting /θ/ with /s/ — try this tongue drill..." |
-| 📊 **Progress Tracking** | SQLite user profile with per-phoneme history over time. Track which sounds are improving and which are stuck. |
-| 👤 **Multi-user Support** | Profile switching, per-user history and accent settings. |
+| 🤖 **Local LLM / 本地大模型** | Ollama (llama3.2 3B or qwen2.5 7B) to generate personalized paragraph feedback — not just "your /θ/ needs work" but "as a Mandarin speaker, you're substituting /θ/ with /s/ — try this tongue drill..." / 使用本地大模型生成个性化段落反馈，不只是「/θ/ 需要练习」，而是「作为中文母语者，你在用 /s/ 替代 /θ/ — 试试把舌尖放在上下齿之间...」 |
+| 📊 **Progress Tracking / 进度追踪** | SQLite user profile with per-phoneme history over time. Track which sounds are improving and which are stuck. / SQLite 用户档案，记录每个音素的历史变化，追踪哪些音在进步、哪些停滞。 |
+| 👤 **Multi-user Support / 多用户** | Profile switching, per-user history and accent settings. / 用户切换，每人独立的历史记录和口音设置。 |
 
-### 🔮 v0.5 — Smart Scoring
+### 🔮 v0.5 — Smart Scoring（远期规划）
 
-| Feature | Description |
+| Feature / 功能 | Description / 说明 |
 |:---|:---|
-| 🧠 **Fine-tuned Classifier** | After collecting user data, fine-tune a small phoneme classifier (wav2vec2 → linear head) on real L2 pronunciation data for more nuanced scoring. |
-| 🌏 **More Accent Profiles** | `ja-JP`, `ko-KR`, `hi-IN`, `es-ES` profiles with language-specific transfer patterns. |
-| 🎮 **Practice Mode** | Gamified phoneme drills based on your weak spots — spaced repetition for pronunciation. |
+| 🧠 **Fine-tuned Classifier / 微调分类器** | After collecting user data, fine-tune a small phoneme classifier (wav2vec2 → linear head) on real L2 pronunciation data for more nuanced scoring. / 积累用户数据后，用真实 L2 发音数据微调小型音素分类器，实现更细腻的评分。 |
+| 🌏 **More Accent Profiles / 更多口音配置** | `ja-JP`, `ko-KR`, `hi-IN`, `es-ES` profiles with language-specific transfer patterns. / 日语、韩语、印地语、西班牙语等母语配置，含各语言特有的迁移模式。 |
+| 🎮 **Practice Mode / 练习模式** | Gamified phoneme drills based on your weak spots — spaced repetition for pronunciation. / 基于薄弱音素的游戏化练习，结合间隔重复提升发音。 |
 
 ---
 
