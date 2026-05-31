@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+*.egg
+.venv/
+
+# Build / cache
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+*.pyc
+
+# Node
+node_modules/
+frontend/dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Env
+.env
+.env.local
+
+# Claude
+.claude/
+
+# Test artifacts
+/tmp/
+*.wav
+*.audio
