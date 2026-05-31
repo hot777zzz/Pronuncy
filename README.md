@@ -21,7 +21,9 @@ Learning English pronunciation is hard. You repeat after an audio clip, but have
 
 Pronuncy gives you **per-phoneme feedback** — it breaks down each word into individual sounds, compares your recording against the correct pronunciation, and tells you exactly which sounds need work. Everything runs **locally on your machine**. Your voice never leaves your computer.
 
-学英语发音最头疼的就是：跟着录音读了，但根本不知道自己读得对不对。市面上的工具要么要联网、要么要付费、要么把录音上传到云端。Pronuncy 把这一切都搬到了本地：逐音素对比你的发音和标准发音，精确到每一个元音和辅音。
+学英语发音最头疼的就是：跟着录音读了，但根本不知道自己读得对不对。市面上的工具要么要联网、要么要付费、要么把录音上传到云端。
+
+Pronuncy 把这一切都搬到了本地：逐音素对比你的发音和标准发音，精确到每一个元音和辅音。所有内容都在本地运行，你的声音不会离开你的电脑。
 
 ---
 
@@ -34,7 +36,6 @@ Pronuncy gives you **per-phoneme feedback** — it breaks down each word into in
 - **🎧 Hear the Difference / 听出差异** — Tap any phoneme card to hear **standard pronunciation** (target word) vs **your own voice** (exact phoneme slice from your recording).
 - **🌐 Bilingual UI / 中英双语界面** — One-click toggle between English and Chinese. Tips and UI both translated.
 - **🧠 Smart Scoring / 智能评分** — Dual scores: Levenshtein alignment (phoneme identity) + acoustic analysis (sound quality).
-- **🎨 Apple-inspired Design / 苹果风格设计** — Clean, rounded, Duolingo-meets-Apple aesthetic with Tailwind CSS.
 - **🧪 Offline-first / 离线可用** — Once models are downloaded (~560MB), everything works without internet.
 
 ---
