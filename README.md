@@ -1,5 +1,9 @@
 <p align="center">
-  <h1 align="center">🔊 Pronuncy</h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo.png" />
+    <img src="assets/logo.png" alt="Pronuncy logo" width="120" />
+  </picture>
+  <h1 align="center">Pronuncy</h1>
   <p align="center"><em>Your personal English pronunciation coach. Private, offline, free.</em></p>
   <p align="center">完全本地的英语发音教练 — 无需联网，无需付费，即开即用。</p>
 </p>
@@ -207,6 +211,8 @@ Pronuncy sits in a sweet spot: **academic-grade analysis** (IPA phonemes + force
 ```
 pronuncy/
 ├── README.md                         # You are here
+├── Makefile                          # One-command dev / test / build
+├── assets/                           # Logo
 ├── docker-compose.yml                # One-command Docker deployment
 ├── backend/
 │   ├── pyproject.toml                # Python deps (uv)
@@ -223,6 +229,8 @@ pronuncy/
 └── frontend/
     ├── src/
     │   ├── components/               # ResultsPanel, AudioRecorder, StatusBar
+    │   ├── types/                    # Shared TS interfaces
+    │   ├── utils/                    # Pure utility functions
     │   ├── i18n/                     # EN/ZH translations
     │   ├── services/                 # API client, phoneme audio playback
     │   └── hooks/                    # useAudioRecorder
