@@ -3,7 +3,6 @@ import type { AssessmentResult } from '../services/api'
 import { useI18n } from '../i18n/I18nContext'
 import type { TranslationKey } from '../i18n/translations'
 import {
-  speakPhoneme,
   playAudioSlice,
   computeWordSlices,
   clearAudioCache,
@@ -88,13 +87,35 @@ export default function ResultsPanel({ result }: Props) {
     doPlay('word-me', i, () => playAudioSlice(trimmedUrl, startMs, endMs))
   }, [trimmedUrl, wordSlices, doPlay])
 
+  // Map each alignment index to the target word that contains this phoneme
+  const wordForAlignmentIndex = useMemo(() => {
+    if (!result) return []
+    const { alignment, word_groups } = result
+    const map: (string | null)[] = new Array(alignment.length).fill(null)
+    let expectedIdx = 0
+    for (let i = 0; i < alignment.length; i++) {
+      if (alignment[i].expected !== null) {
+        for (const wg of word_groups) {
+          if (expectedIdx >= wg.phoneme_start && expectedIdx < wg.phoneme_end) {
+            map[i] = wg.word
+            break
+          }
+        }
+        expectedIdx++
+      }
+    }
+    return map
+  }, [result])
+
   // ── phoneme ──
-  const handlePhonemeStd = useCallback((ipa: string | null) => {
-    if (!ipa) return
-    setActivePlay({ kind: 'phoneme-me', idx: -1 })
-    setTimeout(() => setActivePlay(null), 1200)
-    speakPhoneme(ipa)
-  }, [])
+  const handlePhonemeStd = useCallback((word: string | null) => {
+    if (!word) return
+    doPlay('sentence-std', -1, () => {
+      const utt = new SpeechSynthesisUtterance(word)
+      utt.lang = 'en-US'; utt.rate = 0.65
+      return new Promise(r => { utt.onend = () => r(); speechSynthesis.speak(utt) })
+    })
+  }, [doPlay])
 
   const handlePhonemeMe = useCallback((i: number) => {
     if (!trimmedUrl || !result) return
@@ -191,10 +212,10 @@ export default function ResultsPanel({ result }: Props) {
                 </div>
                 <div className="flex w-full border-t border-inherit">
                   <button
-                    onClick={() => handlePhonemeStd(item.expected)}
-                    disabled={!item.expected}
+                    onClick={() => handlePhonemeStd(wordForAlignmentIndex[i])}
+                    disabled={!wordForAlignmentIndex[i]}
                     className="flex-1 flex items-center justify-center py-1 hover:bg-white/40 transition-colors rounded-bl-xl disabled:opacity-30"
-                    title={item.expected ? 'Standard sound' : undefined}
+                    title={wordForAlignmentIndex[i] ? `Standard — "${wordForAlignmentIndex[i]}"` : undefined}
                   >
                     <SpeakerIcon tiny />
                   </button>
@@ -215,7 +236,7 @@ export default function ResultsPanel({ result }: Props) {
         <p className="text-xs text-gray-400 mt-4 leading-relaxed">
           {t('phonemeHint')}
           <br />
-          🔊 Standard &nbsp;|&nbsp; 🎤 Your voice — exact timestamps from Allosaurus frames
+          🔊 Standard word &nbsp;|&nbsp; 🎤 Your voice slice — wav2vec2-aligned timestamps
         </p>
       </div>
     </div>

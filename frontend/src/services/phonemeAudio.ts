@@ -1,34 +1,7 @@
-// ── IPA → example word (for TTS reference) ──
-const IPA_EXAMPLE: Record<string, string> = {
-  'ɑ': 'father', 'æ': 'cat', 'ʌ': 'cup', 'ɔ': 'caught',
-  'aʊ': 'cow', 'aɪ': 'buy', 'ɛ': 'bed', 'ɝ': 'bird',
-  'eɪ': 'bay', 'ɪ': 'bit', 'i': 'beat', 'oʊ': 'boat',
-  'ɔɪ': 'boy', 'ʊ': 'book', 'u': 'boot',
-  'b': 'bat', 'tʃ': 'church', 'd': 'dog', 'ð': 'this',
-  'f': 'fan', 'ɡ': 'go', 'h': 'hat', 'dʒ': 'judge',
-  'k': 'cat', 'l': 'leg', 'm': 'man', 'n': 'net',
-  'ŋ': 'sing', 'p': 'pat', 'ɹ': 'red', 's': 'sun',
-  'ʃ': 'shoe', 't': 'ten', 'θ': 'thin', 'v': 'van',
-  'w': 'wet', 'j': 'yes', 'z': 'zip', 'ʒ': 'measure',
-}
-
-export function getExampleWord(ipa: string): string | null {
-  return IPA_EXAMPLE[ipa] ?? null
-}
-
 // ── TTS ──
 export function speakText(text: string): void {
   speechSynthesis.cancel()
   const utt = new SpeechSynthesisUtterance(text)
-  utt.lang = 'en-US'; utt.rate = 0.85
-  speechSynthesis.speak(utt)
-}
-
-export function speakPhoneme(ipa: string): void {
-  const word = IPA_EXAMPLE[ipa]
-  if (!word) return
-  speechSynthesis.cancel()
-  const utt = new SpeechSynthesisUtterance(word)
   utt.lang = 'en-US'; utt.rate = 0.85
   speechSynthesis.speak(utt)
 }
