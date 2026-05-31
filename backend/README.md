@@ -44,7 +44,7 @@ backend/
 | ASGI 服务器 | Uvicorn | 支持热重载开发 |
 | 配置管理 | pydantic-settings | 环境变量 + .env 文件 |
 | 日志 | structlog | 结构化日志，控制台彩色输出 |
-| 语音识别 | WhisperX base.en | Whisper 转录，输出词级时间戳 |
+| 语音识别 | WhisperX medium.en | Whisper 转录，输出词级时间戳 |
 | 强制对齐 | wav2vec2 fairseq base 960h | 将文本精确对齐到音频帧 |
 | 语音活动检测 | Pyannote VAD | 过滤静音，只处理有效语音段 |
 | 文本转音素 | g2p-en 2.1 | CMUdict 字典，输出 ARPAbet |
@@ -72,15 +72,15 @@ uv sync
 # 2. 安装开发依赖（可选）
 uv sync --extra dev
 
-# 3. 启动开发服务器（首次运行会自动下载模型约 560MB）
+# 3. 启动开发服务器（首次运行会自动下载模型约 1.9GB）
 uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 # 4. 访问 API 文档
 open http://localhost:8000/docs
 ```
 
-首次运行时会自动下载以下模型：
-- WhisperX base.en (~150MB) → `~/.cache/huggingface/hub/`
+首次运行时会自动下载以下模型（取决于选择的 Whisper 模型）：
+- WhisperX（tiny.en ~75MB / base.en ~150MB / small.en ~500MB / medium.en ~1.5GB）→ `~/.cache/huggingface/hub/`
 - wav2vec2 fairseq 对齐模型 (~360MB) → `~/.cache/torch/hub/checkpoints/`
 - Pyannote VAD 模型 (~50MB) → `~/.cache/torch/hub/checkpoints/`
 
@@ -93,6 +93,38 @@ open http://localhost:8000/docs
 | `HOST` | `0.0.0.0` | 监听地址 |
 | `PORT` | `8000` | 监听端口 |
 | `LOG_LEVEL` | `info` | 日志级别 (debug/info/warning/error) |
+| `WHISPER_MODEL` | `medium.en` | Whisper 模型: `tiny.en` / `base.en` / `small.en` / `medium.en` |
+
+### 首次运行与模型选择
+
+首次启动时无需手动创建 `.env`，程序会在终端弹出交互式菜单：
+
+```
+==============================================================
+  Pronuncy — First-time Setup / 首次运行设置
+==============================================================
+
+  Select Whisper model for speech recognition:
+  请选择语音识别模型：
+
+  1. tiny.en     ~75MB    [需下载 needs download]
+     Fastest, minimal accent detection / 最快，口音检测能力弱
+
+  2. base.en     ~150MB   [已安装 installed]
+     Fast, basic accent detection / 快速，基础口音检测
+
+  3. small.en    ~500MB   [需下载 needs download]
+     Balanced speed/quality, good accent detection
+
+  4. medium.en   ~1.5GB   [需下载 needs download]
+     Best accuracy & accent detection. ★ 推荐 recommended
+
+  Choose / 选择 (1-4) [default=4=medium.en]:
+```
+
+已下载的模型标注 `[已安装 installed]` 可立即使用；未下载的模型会在首次使用时自动下载。
+
+选择结果写入 `backend/.env`，之后可通过编辑该文件或环境变量切换模型。
 
 ## API
 
@@ -257,8 +289,8 @@ docker run -p 8000:8000 \
 
 ## 局限
 
-- WhisperX base.en 转录准确率约 95%，可检测明显误读（识别出错误单词），但无法检测单词内部的细微发音偏差
+- WhisperX medium.en 对口音语音鲁棒性更强，转录准确率更高，可检测明显误读（识别出错误单词），但单词内部的细微发音偏差检测仍有限
 - wav2vec2 强制对齐提供精确词边界，音素内时间戳为按比例估算
 - 不支持实时流式识别，需完整录音后评估
 - 仅支持英语
-- 模型总大小约 560MB，首次下载需良好网络连接
+- 模型总大小约 1.9GB，首次下载需良好网络连接

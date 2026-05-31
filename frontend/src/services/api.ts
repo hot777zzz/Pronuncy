@@ -32,6 +32,19 @@ export interface AccentTip {
   tip: string
 }
 
+export interface ModelInfo {
+  id: string
+  size: string
+  accuracy: string
+  desc: string
+  recommended: boolean
+}
+
+export interface CurrentModel {
+  current: string
+  available: ModelInfo[]
+}
+
 export interface AssessmentResult {
   overall_score: number
   acoustic_score: number | null

@@ -1,24 +1,26 @@
-const BAR_COUNT = 28
+const BAR_COUNT = 36
 
 const heights = Array.from({ length: BAR_COUNT }, () => {
-  // Generate varied heights for a natural waveform look
-  const base = 8 + Math.random() * 28
+  const base = 6 + Math.random() * 28
   return Math.round(base)
 })
 
 export default function Waveform({ active = false }: { active?: boolean }) {
   return (
-    <div className="flex items-center justify-center gap-[3px] h-12 my-6">
+    <div className="flex items-end justify-center gap-[2px] h-14 my-6 px-1">
       {heights.map((h, i) => (
         <div
           key={i}
-          className={`w-[3px] rounded-full transition-all duration-300 ${
-            active ? 'bg-red-400/60 animate-wave-bar' : 'bg-gray-200'
+          className={`w-[3px] rounded-full transition-all duration-500 ${
+            active
+              ? 'bg-gradient-to-t from-terracotta to-amber animate-wave'
+              : 'bg-ink/10'
           }`}
           style={{
-            height: active ? undefined : `${h * 0.5}px`,
-            '--h': `${h}px`,
-            animationDelay: active ? `${i * 0.03}s` : undefined,
+            height: active ? undefined : `${Math.max(4, h * 0.35)}px`,
+            '--wave-h': `${h}px`,
+            animationDelay: active ? `${i * 0.025}s` : undefined,
+            opacity: active ? undefined : 0.5,
           } as React.CSSProperties}
         />
       ))}

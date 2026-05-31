@@ -23,7 +23,7 @@ export default function PracticeCard({ sentence, onEdit }: Props) {
 
   if (editing) {
     return (
-      <div className="bg-white rounded-3xl shadow-xl shadow-gray-200/50 p-8 animate-fade-in-up">
+      <div className="card-surface p-6 animate-fade-in">
         <textarea
           autoFocus
           value={draft}
@@ -35,28 +35,30 @@ export default function PracticeCard({ sentence, onEdit }: Props) {
               handleSave()
             }
           }}
-          className="w-full text-3xl font-bold text-gray-900 bg-transparent border-none outline-none resize-none leading-relaxed text-balance"
+          className="w-full text-2xl font-display font-semibold italic text-ink bg-transparent border-none outline-none resize-none leading-relaxed text-balance placeholder:text-ink-muted/40"
           rows={2}
           placeholder={t('typeSentence')}
         />
-        <p className="text-sm text-gray-400 mt-2">{t('pressEnter')}</p>
+        <p className="text-xs text-ink-muted/50 mt-2 font-sans">{t('pressEnter')}</p>
       </div>
     )
   }
 
   return (
     <div
-      className="bg-white rounded-3xl shadow-xl shadow-gray-200/50 p-8 cursor-text transition-shadow hover:shadow-2xl hover:shadow-gray-200/60"
+      className="card-surface p-6 cursor-text transition-all duration-300 hover:border-amber/30 hover:shadow-md group"
       onClick={() => {
-        setDraft(sentence)
+        setDraft('')
         setEditing(true)
       }}
     >
-      <p className="text-3xl font-bold text-gray-900 leading-relaxed text-balance">
+      <p className="text-2xl font-display font-semibold italic text-ink leading-relaxed text-balance">
         {sentence || t('targetPlaceholder')}
       </p>
       {sentence && (
-        <p className="text-sm text-gray-400 mt-3">{t('clickToEdit')}</p>
+        <p className="text-xs text-ink-muted/40 mt-3 font-sans group-hover:text-amber transition-colors duration-300">
+          {t('clickToEdit')}
+        </p>
       )}
     </div>
   )

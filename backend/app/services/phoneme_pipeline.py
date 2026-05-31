@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import subprocess
 import tempfile
 import time
@@ -13,6 +14,7 @@ import numpy as np
 import whisperx
 from g2p_en import G2p
 
+from app.config import settings
 from app.core.exceptions import AudioDecodeError, ModelInferenceError
 
 from .acoustic_analyzer import AcousticAnalyzer
@@ -41,6 +43,21 @@ def _cleanup_old_files() -> None:
             pass
 
 
+# Punctuation chars stripped from word boundaries (keeps internal apostrophes/hyphens)
+_WORD_PUNCT_RE = re.compile(r"^[.,!?;:\"()\[\]{}'`'']+|[.,!?;:\"()\[\]{}'`'']+$")
+
+
+def _strip_word_punct(word: str) -> str:
+    """Remove leading/trailing sentence punctuation from a word."""
+    return _WORD_PUNCT_RE.sub("", word).strip()
+
+
+def _strip_text_punct(text: str) -> str:
+    """Remove sentence punctuation from full text, collapsing whitespace."""
+    cleaned = re.sub(r"[.,!?;:()\[\]{}\"']", " ", text)
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
 class PhonemePipeline:
     def __init__(self) -> None:
         self.g2p = G2p()
@@ -49,7 +66,7 @@ class PhonemePipeline:
 
         # WhisperX wraps faster-whisper transcription + wav2vec2 forced alignment
         self.whisper = whisperx.load_model(
-            "base.en", device=self.device, compute_type=self.compute_type
+            settings.whisper_model, device=self.device, compute_type=self.compute_type
         )
         self.align_model, self.align_metadata = whisperx.load_align_model(
             language_code="en", device=self.device
@@ -64,7 +81,7 @@ class PhonemePipeline:
         return None
 
     def target_text_to_phonemes(self, text: str) -> tuple[list[str], list[int]]:
-        return arpabet_to_ipa_with_boundaries(self.g2p(text))
+        return arpabet_to_ipa_with_boundaries(self.g2p(_strip_text_punct(text)))
 
     def audio_to_phonemes(
         self, audio_bytes: bytes
@@ -116,7 +133,7 @@ class PhonemePipeline:
         text_parts: list[str] = []
 
         for segment in result.get("segments", []):
-            seg_text = segment.get("text", "").strip()
+            seg_text = _strip_text_punct(segment.get("text", ""))
             if seg_text:
                 text_parts.append(seg_text)
 
@@ -129,7 +146,7 @@ class PhonemePipeline:
                 continue
 
             for word in words:
-                word_text = word.get("word", "").strip()
+                word_text = _strip_word_punct(word.get("word", ""))
                 if not word_text:
                     continue
                 word_arpabet = self.g2p(word_text)
@@ -253,6 +270,7 @@ class PhonemePipeline:
 
     def assess(self, audio_bytes: bytes, target_text: str) -> dict[str, Any]:
         _cleanup_old_files()
+        clean_target = _strip_text_punct(target_text)
         expected, boundaries = self.target_text_to_phonemes(target_text)
         recognized, rec_timestamps, recognized_text = self.audio_to_phonemes(
             audio_bytes
@@ -268,8 +286,8 @@ class PhonemePipeline:
                 item["end_ms"] = ts["end_ms"]
                 rec_idx += 1
 
-        # Build word-level groups
-        words = target_text.strip().split()
+        # Build word-level groups (use clean text without punctuation)
+        words = clean_target.split()
         word_groups: list[dict[str, Any]] = []
         start = 0
         for i, end in enumerate(boundaries):
@@ -291,7 +309,7 @@ class PhonemePipeline:
             })
             start = end
 
-        result["target_text"] = target_text
+        result["target_text"] = clean_target
         result["recognized_text"] = recognized_text
         result["word_groups"] = word_groups
         result["trimmed_audio_url"] = self.trimmed_audio_url
