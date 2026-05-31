@@ -1,119 +1,260 @@
-# Pronuncy
+<p align="center">
+  <h1 align="center">🔊 Pronuncy</h1>
+  <p align="center"><em>Your personal English pronunciation coach. Private, offline, free.</em></p>
+  <p align="center">完全本地的英语发音教练 — 无需联网，无需付费，即开即用。</p>
+</p>
 
-Local English pronunciation assessment tool. / 本地英语发音评估工具。
+---
 
-Record your voice and get per-phoneme feedback using WhisperX + g2p-en. / 录制你的声音，使用 WhisperX + g2p-en 获取音素级反馈。
+<p align="center">
+  <img alt="Python" src="https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white" />
+  <img alt="React" src="https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white" />
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-green" />
+  <img alt="CPU only" src="https://img.shields.io/badge/GPU-not%20needed-orange" />
+</p>
 
-## Prerequisites / 环境要求
+---
 
-- **Python 3.11+** / Python 3.11 及以上
-- **ffmpeg** — for audio format conversion / 音频格式转换
-- **Node.js 18+** — for frontend / 前端依赖
-- **uv** — Python package manager (install: `pip install uv`) / Python 包管理器
+## Why Pronuncy? / 为什么做这个项目？
 
-```bash
-# macOS — install prerequisites
-brew install ffmpeg node uv
+Learning English pronunciation is hard. You repeat after an audio clip, but have no idea if you actually sound right. Existing tools either need an internet connection, charge subscription fees, or send your voice to the cloud.
 
-# Verify
-python3 --version   # >= 3.11
-ffmpeg -version
-node --version      # >= 18
-uv --version
-```
+Pronuncy gives you **per-phoneme feedback** — it breaks down each word into individual sounds, compares your recording against the correct pronunciation, and tells you exactly which sounds need work. Everything runs **locally on your machine**. Your voice never leaves your computer.
 
-## Quick Start / 快速开始
+学英语发音最头疼的就是：跟着录音读了，但根本不知道自己读得对不对。市面上的工具要么要联网、要么要付费、要么把录音上传到云端。Pronuncy 把这一切都搬到了本地：逐音素对比你的发音和标准发音，精确到每一个元音和辅音。
 
-```bash
-# 1. Clone repository / 克隆仓库
-git clone https://github.com/hot777zzz/Pronuncy.git
-cd pronuncy
+---
 
-# 2. Install backend dependencies / 安装后端依赖
-cd backend && uv sync
+## ✨ Features / 特色
 
-# 3. Install frontend dependencies / 安装前端依赖
-cd ../frontend && npm install
+- **🔒 100% Local / 纯本地运行** — No cloud, no account, no data collection. Your voice stays on your machine.
+- **🔬 Per-phoneme Analysis / 逐音素分析** — Not just a vague "85% score". See exactly which sounds you got right and which need practice.
+- **🎧 Hear the Difference / 听出差异** — Tap any phoneme card to hear **standard pronunciation** vs **your own voice** side-by-side. Precise timestamps from wav2vec2 forced alignment let you hear the exact moment.
+- **🌐 Bilingual UI / 中英双语界面** — One-click toggle between English and Chinese. Great for Chinese-speaking English learners.
+- **🧠 Smart Scoring / 智能评分** — Levenshtein alignment maps your phoneme sequence to the target, giving word-level and overall scores.
+- **🎨 Apple-inspired Design / 苹果风格设计** — Clean, rounded, Duolingo-meets-Apple aesthetic with Tailwind CSS.
+- **🧪 Offline-first / 离线可用** — Once models are downloaded (~560MB), everything works without internet.
 
-# 4. Start backend server / 启动后端 (first run downloads ~560MB of models / 首次运行下载约560MB模型)
-cd ../backend && uv run uvicorn app.main:app --reload --port 8000
+---
 
-# 5. Start frontend dev server / 启动前端开发服务器 (in a new terminal / 新终端窗口)
-cd frontend && npm run dev
-```
-
-Then open http://localhost:3000 in your browser. / 然后在浏览器打开 http://localhost:3000。
-
-## Frontend Stack / 前端技术栈
-
-React 18 + TypeScript + Vite 5. Component structure: / 组件结构:
+## 🏗 Architecture / 架构一览
 
 ```
-frontend/src/
-├── App.tsx                          # Main app / 主应用
-├── components/
-│   ├── TargetInput.tsx              # Target sentence input / 目标句子输入
-│   ├── AudioRecorder.tsx            # Recording controls / 录音控制
-│   ├── ResultsPanel.tsx             # Score + alignment display / 结果展示
-│   └── StatusBar.tsx                # App title + language toggle / 标题 + 语言切换
-├── hooks/
-│   └── useAudioRecorder.ts          # Recording logic hook / 录音逻辑
-├── i18n/
-│   ├── I18nContext.tsx              # React context for EN/ZH switching / 中英文切换
-│   └── translations.ts             # Translation dictionary / 翻译字典
-└── services/
-    ├── api.ts                       # Type definitions / 类型定义
-    └── phonemeAudio.ts              # Audio playback helpers / 音频播放工具
+┌─ Your Browser ─────────────────────────────────────────┐
+│  Record voice  →  POST /assess  →  Results + Playback  │
+│  (React + Tailwind + i18n)                             │
+└───────────────────┬────────────────────────────────────┘
+                    │  multipart/form-data
+                    ▼
+┌─ FastAPI Backend ──────────────────────────────────────┐
+│                                                        │
+│  audio bytes → ffmpeg → 16kHz mono WAV                 │
+│       │                                                │
+│       ▼                                                │
+│  WhisperX (base.en) → transcribed text                 │
+│       │                                                │
+│       ▼                                                │
+│  wav2vec2 forced alignment → precise word timestamps   │
+│       │                                                │
+│       ▼                                                │
+│  g2p-en → IPA phonemes per word                        │
+│       │                                                │
+│       ▼                                                │
+│  Levenshtein DP → alignment + scores                   │
+│       │                                                │
+│       ▼                                                │
+│  { overall_score, alignment[], word_groups[] }         │
+└────────────────────────────────────────────────────────┘
 ```
-
-## How It Works / 工作原理
-
-1. Enter a target sentence / 输入目标句子
-2. Record your voice reading it / 录制你的朗读
-3. Server transcribes with WhisperX and force-aligns with wav2vec2 / 服务端用 WhisperX 转录并用 wav2vec2 强制对齐
-4. See per-phoneme feedback with playback from your own voice / 查看逐音素反馈并回放你的发音片段
 
 ### Model Stack / 模型栈
 
-| Component / 组件                    | Model / 模型                    | Size / 大小 |
-| ----------------------------------- | ------------------------------- | ----------- |
-| Speech recognition / 语音识别       | WhisperX base.en                | ~150MB      |
-| Forced alignment / 强制对齐         | wav2vec2 fairseq base 960h      | ~360MB      |
-| Voice activity detection / 语音检测 | Pyannote VAD                    | ~50MB       |
-| Text → phonemes / 文本转音素        | g2p-en (CMUdict)                | ~5MB        |
-| Alignment / 序列对齐                | Levenshtein                     | —           |
+| Stage / 阶段 | Model / 模型 | Size / 大小 | Role / 作用 |
+|:---|:---|:---|:---|
+| 🎙️ Transcription | WhisperX base.en | ~150MB | Speech → text |
+| 📐 Forced Alignment | wav2vec2 fairseq 960h | ~360MB | Text → precise audio timestamps |
+| 🔇 Voice Detection | Pyannote VAD | ~50MB | Filter silence / noise |
+| 📖 Text → Phonemes | g2p-en (CMUdict) | ~5MB | English text → IPA phonemes |
+| 🔤 Sequence Matching | Levenshtein (NumPy) | — | Compare phoneme sequences |
 
-Total model weights / 模型总大小: **~560MB**. Runs entirely on CPU / 纯 CPU 运行，无需 GPU。
+**Total: ~560MB** — Runs on CPU. No GPU required. / 纯 CPU 运行，无需显卡。
 
-## API
+---
 
-`POST /assess` — Multipart form: `audio` (WAV/WebM/MP4) + `target_text` (string)
+## 🚀 Quick Start / 快速开始
 
-```json
+### Prerequisites / 环境要求
+
+- Python 3.11+ / Node.js 18+ / ffmpeg / uv
+
+```bash
+# macOS — one-liner install
+brew install ffmpeg node uv
+```
+
+### 3 Steps to Run / 三步启动
+
+```bash
+# 1. Clone & install
+git clone https://github.com/hot777zzz/Pronuncy.git && cd pronuncy
+cd backend && uv sync && cd ../frontend && npm install && cd ..
+
+# 2. Start backend (first run downloads models ~560MB)
+cd backend && uv run uvicorn app.main:app --reload --port 8000
+
+# 3. Start frontend (new terminal)
+cd frontend && npm run dev
+```
+
+Open **http://localhost:3000**, type a sentence, hit record, and see your phoneme-by-phoneme breakdown.
+
+---
+
+## 📖 How to Use / 使用指南
+
+```
+1. Type a target sentence          e.g. "Hello world"
+   输入你想练习的句子
+
+2. Click the mic and read aloud    按住录音，大声朗读
+   🎤 Recording...
+
+3. Release to assess               松开自动评估
+   See your score in seconds!
+
+4. Tap any phoneme card            点击任意音素卡片
+   🔊 Standard  |  🎤 Your voice   — hear the difference!
+```
+
+### Score Colors / 评分颜色
+
+| Color | Score | Meaning |
+|:---|:---|:---|
+| 🟢 Green | 80–100% | Great job! / 很棒！ |
+| 🟠 Orange | 50–79% | Needs practice / 还需练习 |
+| 🔴 Red | 0–49% | Keep trying! / 继续加油！ |
+
+### Phoneme Status / 音素状态
+
+| Status | Icon | Meaning / 含义 |
+|:---|:---|:---|
+| `correct` | ✅ | You nailed this sound / 发音准确 |
+| `substitution` | 🔄 | Wrong sound in place of the right one / 音素被替换 |
+| `deletion` | ❌ | You skipped a sound / 遗漏音素 |
+| `insertion` | ➕ | Extra sound that shouldn't be there / 多余音素 |
+
+---
+
+## 🔧 API / 接口
+
+```bash
+POST /assess
+Content-Type: multipart/form-data
+
+audio: <file>       # WAV, WebM, MP4 — auto-converted by ffmpeg
+target_text: string
+
+Response:
 {
-  "overall_score": 85.0,
-  "alignment": [
-    { "expected": "h", "recognized": "h", "status": "correct", "start_ms": 94, "end_ms": 153 },
-    { "expected": "ʌ", "recognized": "a", "status": "substitution", "start_ms": 153, "end_ms": 212 }
+  "overall_score": 85.0,       # 0–100
+  "alignment": [               # per-phoneme comparison
+    {
+      "expected":    "h",      # should be this IPA phoneme
+      "recognized":  "h",      # you said this
+      "status":      "correct",# correct | substitution | deletion | insertion
+      "start_ms":    94,       # when you said it (wav2vec2-aligned)
+      "end_ms":      153
+    }
   ],
-  "expected_phones": ["h", "ʌ", "l", "oʊ"],
-  "recognized_phones": ["h", "a", "l", "oʊ"],
-  "recognized_text": "hello",
-  "target_text": "Hello",
-  "word_groups": [
-    { "word": "hello", "phoneme_start": 0, "phoneme_end": 4, "score": 75.0 }
-  ],
-  "trimmed_audio_url": "/audio/abc123.wav"
+  "recognized_text": "hello",  # what Whisper heard
+  "word_groups": [...],        # word-level breakdown with scores
+  "trimmed_audio_url": "..."   # your recording (for playback)
 }
 ```
 
-**Status legend / 状态说明:**
+`GET /audio/{filename}` — Serve trimmed WAV for client-side playback.
 
-- `correct` — 发音正确
-- `substitution` — 发音替换（音素不正确）
-- `deletion` — 遗漏音素
-- `insertion` — 多余音素
+`GET /health` — `{ "status": "ok" }`
 
-## Limitations / 局限
+---
 
-WhisperX base.en transcription accuracy is ~95%. The pipeline can detect when a word is misrecognized (implying significant mispronunciation), but cannot detect subtle within-word phoneme errors — if Whisper correctly identifies the word, all its phonemes are marked correct. / WhisperX base.en 转录准确率约 95%。当单词被误识别时能检测出明显发音偏差，但无法检测单词内部的细微音素错误——若 Whisper 正确识别了单词，则其所有音素均标记为正确。
+## 🤔 Alternatives / 同类项目对比
+
+| Tool | Local? | Per-phoneme? | Playback? | Free? |
+|:---|:---|:---|:---|:---|
+| **Pronuncy** | ✅ 100% offline | ✅ IPA phoneme level | ✅ Your voice + TTS | ✅ Open source |
+| ELSA Speak | ❌ Cloud only | ✅ | ❌ Limited | ❌ Subscription |
+| Speechling | ❌ Cloud only | ❌ Word level only | ❌ | ⚠️ Freemium |
+| Google Pronunciation | ❌ Cloud only | ❌ Black-box score | ❌ | ✅ |
+| Praat (academic) | ✅ Local | ⚠️ Manual analysis | ✅ | ✅ |
+
+Pronuncy sits in a sweet spot: **academic-grade analysis** (IPA phonemes + forced alignment) with a **consumer-friendly UI** (record a sentence, get instant color-coded feedback).
+
+---
+
+## 📁 Project Structure / 项目结构
+
+```
+pronuncy/
+├── README.md                         # You are here
+├── docker-compose.yml                # One-command Docker deployment
+├── backend/
+│   ├── pyproject.toml                # Python deps (uv)
+│   ├── Dockerfile
+│   ├── app/
+│   │   ├── main.py                   # FastAPI app
+│   │   ├── api/endpoints/            # assess.py, audio.py, health.py
+│   │   ├── services/
+│   │   │   ├── phoneme_pipeline.py   # Core: WhisperX → g2p-en → alignment
+│   │   │   └── phoneme_map.py        # ARPAbet ↔ IPA (39 mappings)
+│   │   ├── schemas/assess.py         # Pydantic response models
+│   │   └── core/                     # Exceptions, logging, config
+│   └── tests/
+└── frontend/
+    ├── src/
+    │   ├── components/               # ResultsPanel, AudioRecorder, StatusBar
+    │   ├── i18n/                     # EN/ZH translations
+    │   ├── services/                 # API client, phoneme audio playback
+    │   └── hooks/                    # useAudioRecorder
+    ├── tailwind.config.js
+    └── vite.config.ts
+```
+
+---
+
+## 🐳 Docker / 容器部署
+
+```bash
+docker-compose up
+```
+
+Backend on `:8000`, frontend on `:3000`. Model cache volumes are mounted so you don't re-download on rebuild.
+
+---
+
+## 🧪 Development / 开发
+
+```bash
+# Backend tests
+cd backend && uv run pytest -v
+
+# Lint + type check
+uv run ruff check app/ tests/ && uv run mypy app/
+
+# Frontend
+cd frontend && npm run build    # type-check + production build
+```
+
+---
+
+## ⚠️ Caveats / 注意事项
+
+- **Phoneme detection via transcription** — Pronuncy detects mispronunciations by comparing what Whisper *heard* (as text) against what you *meant* to say. If you mispronounce "world" slightly but Whisper still hears "world", the phoneme-level score stays high. Gross mispronunciations (where Whisper transcribes a different word) are reliably caught.
+- **First-run download** — ~560MB of models are downloaded on first use. A fast internet connection is recommended.
+- **English only** — The pipeline is tuned for English. Other languages are not supported yet.
+
+---
+
+<p align="center">
+  <sub>Built with ❤️ for English learners everywhere. / 献给每一位英语学习者。</sub>
+</p>
