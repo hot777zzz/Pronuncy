@@ -131,11 +131,24 @@ export default function ResultsPanel({ result }: Props) {
   return (
     <div className="animate-fade-in-up space-y-6">
       {/* Score */}
-      <div className="bg-white rounded-3xl shadow-xl shadow-gray-200/50 p-8 flex flex-col items-center gap-4">
-        <div className={`w-28 h-28 rounded-full border-4 flex items-center justify-center ${scoreBg(overall_score)}`}>
-          <span className={`text-4xl font-extrabold ${scoreColor(overall_score)}`}>{overall_score}%</span>
+      <div className="bg-white rounded-3xl shadow-xl shadow-gray-200/50 p-8">
+        <div className="flex items-center justify-center gap-8 flex-wrap">
+          <div className="flex flex-col items-center gap-3">
+            <div className={`w-28 h-28 rounded-full border-4 flex items-center justify-center ${scoreBg(overall_score)}`}>
+              <span className={`text-4xl font-extrabold ${scoreColor(overall_score)}`}>{overall_score}%</span>
+            </div>
+            <p className="text-xs text-gray-400 font-medium">{t('scoreGreat') === t(scoreMessage(overall_score)) ? 'Overall' : 'Overall'}</p>
+          </div>
+          {result.acoustic_score != null && (
+            <div className="flex flex-col items-center gap-3">
+              <div className={`w-20 h-20 rounded-full border-3 flex items-center justify-center ${result.acoustic_score >= 80 ? 'bg-blue-50 border-blue-400' : result.acoustic_score >= 50 ? 'bg-yellow-50 border-yellow-400' : 'bg-red-50 border-red-400'}`}>
+                <span className={`text-2xl font-extrabold ${result.acoustic_score >= 80 ? 'text-blue-500' : result.acoustic_score >= 50 ? 'text-yellow-500' : 'text-red-500'}`}>{result.acoustic_score}%</span>
+              </div>
+              <p className="text-xs text-gray-400 font-medium">Acoustic</p>
+            </div>
+          )}
         </div>
-        <p className="text-sm text-gray-400">{t(scoreMessage(overall_score))}</p>
+        <p className="text-sm text-gray-400 text-center mt-4">{t(scoreMessage(overall_score))}</p>
       </div>
 
       {/* Full sentence */}
@@ -204,11 +217,21 @@ export default function ResultsPanel({ result }: Props) {
             const isActive = activePlay?.kind === 'phoneme-me' && activePlay?.idx === i
             const hasTimestamp = item.start_ms != null && item.end_ms != null
 
+            const ac = item.acoustic
+            const acDot =
+              ac?.quality === 'good' ? 'bg-blue-400'
+              : ac?.quality === 'ok' ? 'bg-yellow-400'
+              : ac?.quality === 'off' ? 'bg-red-400'
+              : ''
+
             return (
               <div key={i} className={`flex flex-col items-center rounded-xl border min-w-[3.5rem] ${color} ${isActive ? 'ring-2 ring-gray-400 scale-105' : ''} transition-all`}>
-                <div className="flex flex-col items-center px-2 pt-1.5 pb-1">
+                <div className="flex flex-col items-center px-2 pt-1.5 pb-1 relative">
                   <span className="text-[10px] opacity-50">{item.expected ?? '—'}</span>
                   <span className="text-sm font-semibold">{item.recognized ?? '—'}</span>
+                  {acDot && (
+                    <span className={`absolute top-0 right-0 w-1.5 h-1.5 rounded-full ${acDot}`} title={ac?.detail} />
+                  )}
                 </div>
                 <div className="flex w-full border-t border-inherit">
                   <button
@@ -236,9 +259,36 @@ export default function ResultsPanel({ result }: Props) {
         <p className="text-xs text-gray-400 mt-4 leading-relaxed">
           {t('phonemeHint')}
           <br />
-          🔊 Standard word &nbsp;|&nbsp; 🎤 Your voice slice — wav2vec2-aligned timestamps
+          🔊 Standard word &nbsp;|&nbsp; 🎤 Your voice slice &nbsp;|&nbsp;
+          <span className="inline-flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-400" /> good
+            <span className="w-1.5 h-1.5 rounded-full bg-yellow-400" /> ok
+            <span className="w-1.5 h-1.5 rounded-full bg-red-400" /> off
+            &nbsp;acoustic
+          </span>
         </p>
       </div>
+
+      {/* Accent tips */}
+      {result.accent_tips.length > 0 && (
+        <div className="bg-white rounded-3xl shadow-xl shadow-gray-200/50 p-8">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-4">Pronunciation Tips</h3>
+          <div className="space-y-3">
+            {result.accent_tips.map((tip, i) => (
+              <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-blue-50 border border-blue-100">
+                <span className="text-lg mt-0.5">💡</span>
+                <div>
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="text-xs font-mono bg-blue-200 text-blue-700 px-1.5 py-0.5 rounded">{tip.pattern}</span>
+                    <span className="text-[10px] text-blue-400 uppercase">{tip.frequency === 'very_high' ? 'Very common' : tip.frequency === 'high' ? 'Common' : 'Occasional'}</span>
+                  </div>
+                  <p className="text-sm text-gray-700 leading-relaxed">{tip.tip}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

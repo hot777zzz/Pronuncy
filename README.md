@@ -29,9 +29,11 @@ Pronuncy gives you **per-phoneme feedback** — it breaks down each word into in
 
 - **🔒 100% Local / 纯本地运行** — No cloud, no account, no data collection. Your voice stays on your machine.
 - **🔬 Per-phoneme Analysis / 逐音素分析** — Not just a vague "85% score". See exactly which sounds you got right and which need practice.
-- **🎧 Hear the Difference / 听出差异** — Tap any phoneme card to hear **standard pronunciation** vs **your own voice** side-by-side. Precise timestamps from wav2vec2 forced alignment let you hear the exact moment.
-- **🌐 Bilingual UI / 中英双语界面** — One-click toggle between English and Chinese. Great for Chinese-speaking English learners.
-- **🧠 Smart Scoring / 智能评分** — Levenshtein alignment maps your phoneme sequence to the target, giving word-level and overall scores.
+- **🔊 Acoustic Quality Score / 声学质量评分** — Measures your actual sound production — formants for vowels, spectral centroid for fricatives, duration and energy. Compared against native speaker reference values (Peterson & Barney).
+- **💡 Personalized Tips / 个性化纠正建议** — Matches your error patterns against an L1 accent knowledge base. For example, if you substitute /θ/ with /s/, you get a specific tip about tongue placement between the teeth.
+- **🎧 Hear the Difference / 听出差异** — Tap any phoneme card to hear **standard pronunciation** (target word) vs **your own voice** (exact phoneme slice from your recording).
+- **🌐 Bilingual UI / 中英双语界面** — One-click toggle between English and Chinese. Tips and UI both translated.
+- **🧠 Smart Scoring / 智能评分** — Dual scores: Levenshtein alignment (phoneme identity) + acoustic analysis (sound quality).
 - **🎨 Apple-inspired Design / 苹果风格设计** — Clean, rounded, Duolingo-meets-Apple aesthetic with Tailwind CSS.
 - **🧪 Offline-first / 离线可用** — Once models are downloaded (~560MB), everything works without internet.
 
@@ -63,7 +65,13 @@ Pronuncy gives you **per-phoneme feedback** — it breaks down each word into in
 │  Levenshtein DP → alignment + scores                   │
 │       │                                                │
 │       ▼                                                │
-│  { overall_score, alignment[], word_groups[] }         │
+│  Acoustic analysis → formants, spectral, duration      │
+│       │                                                │
+│       ▼                                                │
+│  Accent knowledge base → personalized tips             │
+│       │                                                │
+│       ▼                                                │
+│  { score, alignment[], acoustic[], tips[] }            │
 └────────────────────────────────────────────────────────┘
 ```
 
@@ -75,7 +83,9 @@ Pronuncy gives you **per-phoneme feedback** — it breaks down each word into in
 | 📐 Forced Alignment | wav2vec2 fairseq 960h | ~360MB | Text → precise audio timestamps |
 | 🔇 Voice Detection | Pyannote VAD | ~50MB | Filter silence / noise |
 | 📖 Text → Phonemes | g2p-en (CMUdict) | ~5MB | English text → IPA phonemes |
-| 🔤 Sequence Matching | Levenshtein (NumPy) | — | Compare phoneme sequences |
+| 🔊 Acoustic Analysis | NumPy/SciPy DSP | — | Formants, spectral, duration per phoneme |
+| 🧠 Accent KB | Rule engine (YAML) | — | L1→English transfer pattern matching |
+| 🔤 Sequence Matching | Levenshtein DP | — | Compare phoneme sequences |
 
 **Total: ~560MB** — Runs on CPU. No GPU required. / 纯 CPU 运行，无需显卡。
 
@@ -252,6 +262,36 @@ cd frontend && npm run build    # type-check + production build
 - **Phoneme detection via transcription** — Pronuncy detects mispronunciations by comparing what Whisper *heard* (as text) against what you *meant* to say. If you mispronounce "world" slightly but Whisper still hears "world", the phoneme-level score stays high. Gross mispronunciations (where Whisper transcribes a different word) are reliably caught.
 - **First-run download** — ~560MB of models are downloaded on first use. A fast internet connection is recommended.
 - **English only** — The pipeline is tuned for English. Other languages are not supported yet.
+
+---
+
+## 🗺 Roadmap / 路线图
+
+### ✅ v0.1 — Hello World (done)
+Basic recording → Allosaurus phoneme recognition → Levenshtein alignment → score + playback.
+
+### ✅ v0.2 — Accurate Alignment (done)
+Replaced Allosaurus with **WhisperX** (faster-whisper + wav2vec2 forced alignment). Transcription accuracy jumped from ~70% to ~95%. Word-level and phoneme-level timestamps are now frame-accurate.
+
+### ✅ v0.3 — Acoustic Layer (done)
+- **Acoustic Quality Score** — F1/F2 formants for vowels, spectral centroid for fricatives, F0 + duration + energy. Compared against Peterson & Barney native speaker reference values.
+- **Accent Knowledge Base** — Rule-based matching of L1→English transfer patterns. First profile: `zh-CN` (12 common Chinese→English patterns with bilingual tips).
+
+### 🚧 v0.4 — Smart Feedback (next)
+
+| Feature | Description |
+|:---|:---|
+| 🤖 **Local LLM** | Ollama (llama3.2 3B or qwen2.5 7B) to generate personalized paragraph feedback — not just "your /θ/ needs work" but "as a Mandarin speaker, you're substituting /θ/ with /s/ — try this tongue drill..." |
+| 📊 **Progress Tracking** | SQLite user profile with per-phoneme history over time. Track which sounds are improving and which are stuck. |
+| 👤 **Multi-user Support** | Profile switching, per-user history and accent settings. |
+
+### 🔮 v0.5 — Smart Scoring
+
+| Feature | Description |
+|:---|:---|
+| 🧠 **Fine-tuned Classifier** | After collecting user data, fine-tune a small phoneme classifier (wav2vec2 → linear head) on real L2 pronunciation data for more nuanced scoring. |
+| 🌏 **More Accent Profiles** | `ja-JP`, `ko-KR`, `hi-IN`, `es-ES` profiles with language-specific transfer patterns. |
+| 🎮 **Practice Mode** | Gamified phoneme drills based on your weak spots — spaced repetition for pronunciation. |
 
 ---
 

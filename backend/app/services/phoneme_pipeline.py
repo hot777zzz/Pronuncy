@@ -15,6 +15,8 @@ from g2p_en import G2p
 
 from app.core.exceptions import AudioDecodeError, ModelInferenceError
 
+from .acoustic_analyzer import AcousticAnalyzer
+from .accent_profiles import load_profile, match_tip
 from .phoneme_map import (
     arpabet_to_ipa_with_boundaries,
     phones_equal,
@@ -52,6 +54,7 @@ class PhonemePipeline:
         self.align_model, self.align_metadata = whisperx.load_align_model(
             language_code="en", device=self.device
         )
+        self.acoustic = AcousticAnalyzer()
         self._trimmed_wav_path: Path | None = None
 
     @property
@@ -292,6 +295,80 @@ class PhonemePipeline:
         result["recognized_text"] = recognized_text
         result["word_groups"] = word_groups
         result["trimmed_audio_url"] = self.trimmed_audio_url
+
+        # ── Acoustic analysis ──
+        if (
+            recognized
+            and rec_timestamps
+            and self._trimmed_wav_path
+            and self._trimmed_wav_path.exists()
+        ):
+            try:
+                acoustic_results = self.acoustic.analyze(
+                    self._trimmed_wav_path, recognized, rec_timestamps
+                )
+            except Exception:
+                acoustic_results = []
+
+            # Map acoustic results to alignment items
+            ac_idx = 0
+            for item in result["alignment"]:
+                if item["recognized"] is not None and ac_idx < len(acoustic_results):
+                    ac = acoustic_results[ac_idx]
+                    item["acoustic"] = {
+                        "phoneme": ac["phoneme"],
+                        "start_ms": ac["start_ms"],
+                        "end_ms": ac["end_ms"],
+                        "quality": ac["acoustic_quality"],
+                        "score": ac["acoustic_score"],
+                        "detail": ac.get("acoustic_detail", ""),
+                        "tip": ac.get("acoustic_tip", ""),
+                        "features": ac.get("acoustic_features"),
+                    }
+                    ac_idx += 1
+
+            # Compute acoustic score from recognized phonemes with timestamps
+            if acoustic_results:
+                valid_scores = [
+                    a["acoustic_score"] for a in acoustic_results if a["acoustic_score"] > 0
+                ]
+                if valid_scores:
+                    result["acoustic_score"] = round(
+                        sum(valid_scores) / len(valid_scores) * 100, 1
+                    )
+
+            # Match against accent knowledge base
+            profile = load_profile("zh-CN")
+            if profile:
+                tips: list[dict[str, str]] = []
+                seen_patterns: set[str] = set()
+                for item in result["alignment"]:
+                    if (
+                        item["status"] == "substitution"
+                        and item["expected"]
+                        and item["recognized"]
+                    ):
+                        pattern_key = f"{item['expected']}→{item['recognized']}"
+                        if pattern_key in seen_patterns:
+                            continue
+                        seen_patterns.add(pattern_key)
+                        tip_text = match_tip(
+                            item["expected"], item["recognized"], "zh-CN"
+                        )
+                        if tip_text:
+                            pattern_info = None
+                            for p in profile.get("patterns", []):
+                                if p["from"] == item["expected"] and p["to"] == item["recognized"]:
+                                    pattern_info = p
+                                    break
+                            tips.append({
+                                "phoneme": item["expected"],
+                                "pattern": pattern_key,
+                                "frequency": pattern_info.get("frequency", "medium") if pattern_info else "medium",
+                                "tip": tip_text,
+                            })
+                result["accent_tips"] = tips
+
         result["debug"] = {
             "expected_phones": expected,
             "recognized_phones": recognized,
