@@ -10,6 +10,7 @@ from app.config import settings
 from app.core.exceptions import PronuncyError
 from app.core.handlers import generic_exception_handler, pronuncy_exception_handler
 from app.core.logging import setup_logging
+from app.db import init_db
 from app.model_setup import ensure_model_selected
 
 # .env path relative to backend/ directory: backend/app/main.py → backend/.env
@@ -20,6 +21,7 @@ _ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     setup_logging()
     ensure_model_selected(_ENV_PATH, settings)
+    init_db(settings.db_path)
     yield
 
 

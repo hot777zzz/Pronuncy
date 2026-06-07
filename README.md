@@ -37,43 +37,58 @@ Pronuncy 把这一切都搬到了本地：逐音素对比你的发音和标准�
 - **🌐 Bilingual UI / 中英双语界面** — One-click toggle between English and Chinese. Tips and UI both translated.
 - **🧠 Smart Scoring / 智能评分** — Dual scores: Levenshtein alignment (phoneme identity) + acoustic analysis (sound quality).
 - **🧪 Offline-first / 离线可用** — Once models are downloaded (~1.9GB), everything works without internet.
+- **🤖 AI Coach Chat / AI 教练对话** — Chat with an AI pronunciation coach that analyzes your recordings and gives personalized feedback. The coach proactively suggests practice sentences with inline recording. Bring your own API key (OpenAI-compatible). / 与 AI 发音教练对话，分析录音并给出个性化反馈。教练会主动在对话中嵌入练习邀请，点击即可录音。自带 API Key（兼容 OpenAI 接口）。
+- **📊 Progress Tracking / 学习进度追踪** — SQLite-backed history of every assessment. Per-phoneme accuracy trends over time. / 基于 SQLite 的每次评估记录，逐音素正确率趋势追踪。
 
 ---
 
 ## 🏗 Architecture / 架构一览
 
 ```
-┌─ Your Browser ─────────────────────────────────────────┐
-│  Record voice  →  POST /assess  →  Results + Playback  │
-│  (React + Tailwind + i18n)                             │
-└───────────────────┬────────────────────────────────────┘
-                    │  multipart/form-data
+┌─ Your Browser ─────────────────────────────────────────────────┐
+│  Agent Chat  ←→  Inline Recording  →  Results + AI Feedback   │
+│  (React + TypeScript + Tailwind + i18n)                        │
+└───────────────────┬────────────────────────────────────────────┘
+                    │  multipart/form-data  |  SSE streaming
                     ▼
-┌─ FastAPI Backend ──────────────────────────────────────┐
-│                                                        │
-│  audio bytes → ffmpeg → 16kHz mono WAV                 │
-│       │                                                │
-│       ▼                                                │
-│  WhisperX (medium.en) → transcribed text               │
-│       │                                                │
-│       ▼                                                │
-│  wav2vec2 forced alignment → precise word timestamps   │
-│       │                                                │
-│       ▼                                                │
-│  g2p-en → IPA phonemes per word                        │
-│       │                                                │
-│       ▼                                                │
-│  Levenshtein DP → alignment + scores                   │
-│       │                                                │
-│       ▼                                                │
-│  Acoustic analysis → formants, spectral, duration      │
-│       │                                                │
-│       ▼                                                │
-│  Accent knowledge base → personalized tips             │
-│       │                                                │
-│       ▼                                                │
-│  { score, alignment[], acoustic[], tips[] }            │
-└────────────────────────────────────────────────────────┘
+┌─ FastAPI Backend ──────────────────────────────────────────────┐
+│                                                                │
+│  ┌─ Assessment Pipeline ────────────────────────────────────┐ │
+│  │ audio bytes → ffmpeg → 16kHz mono WAV                    │ │
+│  │      │                                                   │ │
+│  │      ▼                                                   │ │
+│  │ WhisperX (medium.en) → transcribed text                  │ │
+│  │      │                                                   │ │
+│  │      ▼                                                   │ │
+│  │ wav2vec2 forced alignment → precise word timestamps      │ │
+│  │      │                                                   │ │
+│  │      ▼                                                   │ │
+│  │ g2p-en → IPA phonemes per word                           │ │
+│  │      │                                                   │ │
+│  │      ▼                                                   │ │
+│  │ Levenshtein DP → alignment + scores                      │ │
+│  │      │                                                   │ │
+│  │      ▼                                                   │ │
+│  │ Acoustic analysis → formants, spectral, duration         │ │
+│  │      │                                                   │ │
+│  │      ▼                                                   │ │
+│  │ Accent knowledge base → personalized tips                │ │
+│  └──────────────────────────────────────────────────────────┘ │
+│                                                                │
+│  ┌─ Agent Layer ────────────────────────────────────────────┐ │
+│  │ OpenAI-compatible streaming → tool-calling loop           │ │
+│  │   ├─ query_phoneme_history  (check recurring errors)      │ │
+│  │   ├─ analyze_error_patterns (find systematic issues)      │ │
+│  │   └─ compare_progress       (contextualize vs history)    │ │
+│  └──────────────────────────────────────────────────────────┘ │
+│                                                                │
+│  ┌─ Storage ────────────────────────────────────────────────┐ │
+│  │ SQLite: assessments, alignment_items, phoneme_history,    │ │
+│  │         agent_feedback_cache                               │ │
+│  └──────────────────────────────────────────────────────────┘ │
+│                                                                │
+│  { score, alignment[], acoustic[], tips[], assessment_id }     │
+└────────────────────────────────────────────────────────────────┘
 ```
 
 ### Model Stack / 模型栈
@@ -211,6 +226,18 @@ Response:
 
 `GET /health` — `{ "status": "ok" }`
 
+`GET /model` — `{ "current": "medium.en", "available": [...] }` — Current Whisper model and options.
+
+`GET /history?session_id=x` — `{ "items": [...], "total": n }` — Recent assessment summaries.
+
+`GET /history/{id}` — Full assessment detail by ID.
+
+`GET /history/progress?session_id=x` — Per-phoneme accuracy trends over time.
+
+`POST /agent/chat` — SSE stream for free-form coach conversation (requires API key).
+
+`POST /agent/feedback` — SSE stream for AI analysis of a completed assessment (requires API key).
+
 ---
 
 ## 🤔 Alternatives / 同类项目对比
@@ -239,22 +266,43 @@ pronuncy/
 │   ├── pyproject.toml                # Python deps (uv)
 │   ├── Dockerfile
 │   ├── app/
-│   │   ├── main.py                   # FastAPI app
-│   │   ├── api/endpoints/            # assess.py, audio.py, health.py
+│   │   ├── main.py                   # FastAPI app + lifespan (DB init)
+│   │   ├── config.py                 # pydantic-settings (env config)
+│   │   ├── api/endpoints/            # assess, audio, health, models, history, agent
+│   │   ├── agent/                    # AI coach module
+│   │   │   ├── gateway.py           # SSE orchestration + tool loop
+│   │   │   ├── prompts.py           # Bilingual system prompts
+│   │   │   ├── tools.py             # Agent tools (phoneme history, patterns, progress)
+│   │   │   ├── cache.py             # Feedback cache wrapper
+│   │   │   └── providers/           # OpenAI-compatible streaming provider
+│   │   ├── db/                       # SQLite storage
+│   │   │   ├── schema.sql           # DDL (assessments, alignment_items, phoneme_history, cache)
+│   │   │   ├── connection.py        # Connection manager (WAL mode)
+│   │   │   └── queries.py           # CRUD + aggregate queries
 │   │   ├── services/
 │   │   │   ├── phoneme_pipeline.py   # Core: WhisperX → g2p-en → alignment
 │   │   │   └── phoneme_map.py        # ARPAbet ↔ IPA (39 mappings)
-│   │   ├── schemas/assess.py         # Pydantic response models
-│   │   └── core/                     # Exceptions, logging, config
+│   │   ├── schemas/                  # Pydantic models (assess, agent, history)
+│   │   └── core/                     # Exceptions, handlers, logging
 │   └── tests/
 └── frontend/
     ├── src/
-    │   ├── components/               # ResultsPanel, AudioRecorder, StatusBar
-    │   ├── types/                    # Shared TS interfaces
-    │   ├── utils/                    # Pure utility functions
-    │   ├── i18n/                     # EN/ZH translations
-    │   ├── services/                 # API client, phoneme audio playback
-    │   └── hooks/                    # useAudioRecorder
+    │   ├── App.tsx                   # Root: Chat-first layout
+    │   ├── components/
+    │   │   ├── AgentChat.tsx         # Chat container with streaming + practice
+    │   │   ├── ChatBubble.tsx        # Message bubble with /practice: parsing
+    │   │   ├── ChatInput.tsx         # Text input (no mode toggle)
+    │   │   ├── PracticePrompt.tsx    # Inline recording + assessment card
+    │   │   ├── SettingsModal.tsx     # API key / model / base URL config
+    │   │   ├── HistoryList.tsx       # Slide-over history panel
+    │   │   ├── ProgressChart.tsx     # Per-phoneme sparkline chart
+    │   │   ├── AnimatedScore.tsx     # GSAP score ring animation
+    │   │   ├── StatusBar.tsx         # App title + model badge + lang toggle
+    │   │   └── ...                   # ResultsPanel, Waveform, ModelBadge, etc.
+    │   ├── services/                 # API client, agent SSE, history, phoneme audio
+    │   ├── i18n/                     # EN/ZH translations (TranslationKey typed)
+    │   ├── hooks/                    # useAudioRecorder
+    │   └── utils/                    # Practice quotes, etc.
     ├── tailwind.config.js
     └── vite.config.ts
 ```
@@ -309,21 +357,21 @@ Replaced Allosaurus with **WhisperX** (faster-whisper + wav2vec2 forced alignmen
 - **Acoustic Quality Score** — F1/F2 formants for vowels, spectral centroid for fricatives, F0 + duration + energy. Compared against Peterson & Barney native speaker reference values. / 声学质量评分：元音 F1/F2 共振峰、擦音频谱质心、基频 F0 + 时长 + 能量，与 Peterson & Barney 母语者参考值对比。
 - **Accent Knowledge Base** — Rule-based matching of L1→English transfer patterns. First profile: `zh-CN` (12 common Chinese→English patterns with bilingual tips). / 口音知识库：基于规则的 L1→英语迁移模式匹配，首个配置 `zh-CN`（12 种中文→英语常见迁移模式，含中英双语建议）。
 
-### 🚧 v0.4 — Smart Feedback（下一步）
+### ✅ v0.4 — Agent Feedback & Progress（已完成）
 
-| Feature / 功能                      | Description / 说明                                                                                                                                                                                                                                                                                                                             |
-| :---------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 🤖 **Local LLM / 本地大模型**       | Ollama (llama3.2 3B or qwen2.5 7B) to generate personalized paragraph feedback — not just "your /θ/ needs work" but "as a Mandarin speaker, you're substituting /θ/ with /s/ — try this tongue drill..." / 使用本地大模型生成个性化段落反馈，不只是「/θ/ 需要练习」，而是「作为中文母语者，你在用 /s/ 替代 /θ/ — 试试把舌尖放在上下齿之间...」 |
-| 📊 **Progress Tracking / 进度追踪** | SQLite user profile with per-phoneme history over time. Track which sounds are improving and which are stuck. / SQLite 用户档案，记录每个音素的历史变化，追踪哪些音在进步、哪些停滞。                                                                                                                                                          |
-| 👤 **Multi-user Support / 多用户**  | Profile switching, per-user history and accent settings. / 用户切换，每人独立的历史记录和口音设置。                                                                                                                                                                                                                                            |
+| Feature / 功能                          | Description / 说明                                                                                                                                                                                                                                                                                              |
+| :-------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 📊 **SQLite Progress Tracking / 进度追踪** | Per-phoneme history over time via SQLite. Track which sounds are improving and which are stuck. / 基于 SQLite 的逐音素历史记录，追踪哪些音在进步、哪些停滞。                                                                                                                                                    |
+| 🤖 **Agent-style Chat / Agent 对话** | OpenAI-compatible streaming chat with tool-calling loop. The coach proactively suggests practice sentences using `/practice:` format, which renders inline recording buttons. Practice results flow back to the agent for personalized feedback. / 兼容 OpenAI 的流式对话，支持工具调用循环。教练通过 `/practice:` 格式主动建议练习句子，前端渲染为内嵌录音按钮，练习结果回传 agent 获取个性化反馈。 |
+| 🗄️ **Assessment Persistence / 评估持久化** | Every assessment saved to SQLite with full alignment details. Agent feedback cached and reused. / 每次评估完整存入 SQLite，Agent 反馈缓存复用。 |
 
-### 🔮 v0.5 — Smart Scoring（远期规划）
+### 🚧 v0.5 — Smart Scoring（下一步）
 
 | Feature / 功能                             | Description / 说明                                                                                                                                                                                                           |
 | :----------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 🧠 **Fine-tuned Classifier / 微调分类器**  | After collecting user data, fine-tune a small phoneme classifier (wav2vec2 → linear head) on real L2 pronunciation data for more nuanced scoring. / 积累用户数据后，用真实 L2 发音数据微调小型音素分类器，实现更细腻的评分。 |
 | 🌏 **More Accent Profiles / 更多口音配置** | `ja-JP`, `ko-KR`, `hi-IN`, `es-ES` profiles with language-specific transfer patterns. / 日语、韩语、印地语、西班牙语等母语配置，含各语言特有的迁移模式。                                                                     |
-| 🎮 **Practice Mode / 练习模式**            | Gamified phoneme drills based on your weak spots — spaced repetition for pronunciation. / 基于薄弱音素的游戏化练习，结合间隔重复提升发音。                                                                                   |
+| 🎮 **Gamified Drills / 游戏化练习**        | Spaced repetition drills targeting weak phonemes with streak tracking. / 基于薄弱音素的间隔重复练习，追踪连续打卡天数。                                                                                                     |
 
 ---
 

@@ -8,6 +8,10 @@ export default defineConfig({
     proxy: {
       '/assess': 'http://localhost:8000',
       '/health': 'http://localhost:8000',
+      '/agent': 'http://localhost:8000',
+      '/history': 'http://localhost:8000',
+      '/model': 'http://localhost:8000',
+      '/audio': 'http://localhost:8000',
     },
   },
 })

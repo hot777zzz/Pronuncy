@@ -12,3 +12,7 @@ class ModelInferenceError(PronuncyError):
 
 class ValidationError(PronuncyError):
     """Raised when input validation fails."""
+
+
+class NotFoundError(PronuncyError):
+    """Raised when a requested resource is not found."""

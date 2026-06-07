@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react'
-import type { AssessmentResult } from '../services/api'
+import type { AssessmentResult, UserConfig } from '../services/api'
 import { useI18n } from '../i18n/I18nContext'
 import type { TranslationKey } from '../i18n/translations'
 import {
@@ -7,11 +7,14 @@ import {
   computeWordSlices,
   clearAudioCache,
 } from '../services/phonemeAudio'
+import AgentFeedbackPanel from './AgentFeedbackPanel'
 
 const API_BASE = 'http://localhost:8000'
 
 interface Props {
   result: AssessmentResult | null
+  assessmentId?: string | null
+  config?: UserConfig
 }
 
 // ── helpers ──
@@ -76,7 +79,7 @@ type PlayKind = 'sentence-std' | 'sentence-me' | 'word-me' | 'phoneme-me'
 
 // ── component ──
 
-export default function ResultsPanel({ result }: Props) {
+export default function ResultsPanel({ result, assessmentId, config }: Props) {
   const { t } = useI18n()
   const [activePlay, setActivePlay] = useState<{
     kind: PlayKind
@@ -502,6 +505,16 @@ export default function ResultsPanel({ result }: Props) {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* ═══ Agent AI Feedback ═══ */}
+      {assessmentId && (
+        <div className="border-t border-cream-dark pt-4">
+          <h3 className="text-[11px] font-sans font-semibold text-ink-muted uppercase tracking-widest mb-3">
+            {t('aiFeedback')}
+          </h3>
+          <AgentFeedbackPanel assessmentId={assessmentId} config={config || { apiKey: '', baseUrl: '', model: '' }} />
         </div>
       )}
     </div>

@@ -56,8 +56,89 @@ export interface AssessmentResult {
   word_groups: WordGroup[]
   accent_tips: AccentTip[]
   trimmed_audio_url: string | null
+  assessment_id: string
+  session_id: string
 }
 
 export interface AssessError {
   error: string
+}
+
+// v0.4: Agent types
+export interface AgentFeedbackRequest {
+  assessment_id: string
+  force?: boolean
+}
+
+export interface StreamEvent {
+  event: 'thinking' | 'tool_call' | 'tool_result' | 'section' | 'text' | 'done'
+  data: Record<string, unknown>
+}
+
+export interface AgentFeedback {
+  assessment_id: string
+  accent_tasks: string
+  speaking_suggestions: string
+  improvement_plan: string
+  cached: boolean
+}
+
+// v0.5: Chat types
+export interface UserConfig {
+  apiKey: string
+  baseUrl: string
+  model: string
+}
+
+export interface ChatMessage {
+  id: string
+  role: 'user' | 'agent' | 'system'
+  content: string
+  timestamp: number
+  // For practice results embedded in chat
+  assessmentResult?: AssessmentResult
+}
+
+export interface ChatRequest {
+  message: string
+  session_id: string
+  api_key: string
+  base_url: string
+  model: string
+}
+
+export interface HistoryItem {
+  id: string
+  target_text: string
+  overall_score: number
+  acoustic_score: number | null
+  created_at: string
+}
+
+export interface HistoryListResponse {
+  items: HistoryItem[]
+  total: number
+}
+
+export interface ProgressPoint {
+  assessment_id: string
+  status: string
+  recognized_as: string | null
+  acoustic_score: number | null
+  overall_score: number
+  created_at: string
+}
+
+export interface PhonemeProgress {
+  phoneme: string
+  total_attempts: number
+  correct_count: number
+  average_acoustic: number | null
+  average_overall: number | null
+  last_practiced: string | null
+  recent_history: ProgressPoint[]
+}
+
+export interface ProgressResponse {
+  phonemes: PhonemeProgress[]
 }

@@ -29,6 +29,11 @@ frontend/dist/
 
 # Claude
 .claude/
+.agents/
+skills-lock.json
+
+# Database
+backend/data/
 
 # Test artifacts
 /tmp/

@@ -11,10 +11,12 @@ export async function getCurrentModel(): Promise<CurrentModel> {
 export async function assessPronunciation(
   audio: Blob,
   targetText: string,
+  sessionId: string,
 ): Promise<AssessmentResult> {
   const formData = new FormData()
   formData.append('audio', audio, 'recording.wav')
   formData.append('target_text', targetText)
+  formData.append('session_id', sessionId)
 
   const resp = await fetch(`${API_BASE}/assess`, {
     method: 'POST',

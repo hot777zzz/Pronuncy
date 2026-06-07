@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 
 from .exceptions import (
     AudioDecodeError,
+    NotFoundError,
     PronuncyError,
     ValidationError,
 )
@@ -14,6 +15,8 @@ async def pronuncy_exception_handler(
     status = 500
     if isinstance(exc, ValidationError):
         status = 400
+    elif isinstance(exc, NotFoundError):
+        status = 404
     elif isinstance(exc, AudioDecodeError):
         status = 422
     return JSONResponse(status_code=status, content={"error": str(exc)})

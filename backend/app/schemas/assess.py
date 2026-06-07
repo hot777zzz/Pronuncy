@@ -51,3 +51,5 @@ class AssessResponse(BaseModel):
     accent_tips: list[AccentTip] = []
     trimmed_audio_url: str | None = None
     debug: dict | None = None
+    assessment_id: str = ""
+    session_id: str = ""

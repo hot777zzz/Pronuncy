@@ -12,23 +12,42 @@ backend/
 ├── Dockerfile                  # 生产镜像
 ├── app/
 │   ├── __init__.py
-│   ├── main.py                 # FastAPI 应用工厂 + lifespan
+│   ├── main.py                 # FastAPI 应用工厂 + lifespan (DB 初始化)
 │   ├── config.py               # pydantic-settings 配置
+│   ├── model_setup.py          # 首次运行 Whisper 模型选择器
 │   ├── api/
 │   │   ├── __init__.py
 │   │   ├── router.py           # 顶层路由聚合
 │   │   └── endpoints/
 │   │       ├── health.py       # GET /health
 │   │       ├── assess.py       # POST /assess
-│   │       └── audio.py        # GET /audio/{filename}
+│   │       ├── audio.py        # GET /audio/{filename}
+│   │       ├── models.py       # GET /model
+│   │       ├── history.py      # GET /history, /history/{id}, /history/progress
+│   │       └── agent.py        # POST /agent/chat, POST /agent/feedback
+│   ├── agent/                   # AI 教练模块 (v0.4)
+│   │   ├── gateway.py          # SSE 编排 + 工具执行循环
+│   │   ├── prompts.py          # 双语系统提示词 (CHAT + FEEDBACK)
+│   │   ├── tools.py            # Agent 工具 (3 工具: 音素历史, 错误模式, 进度对比)
+│   │   ├── cache.py            # 反馈缓存包装器
+│   │   └── providers/          # LLM Provider 抽象层
+│   │       ├── base.py         # 抽象 AgentProvider + AgentEvent
+│   │       ├── openai.py       # OpenAI 兼容 SSE 流式 Provider
+│   │       └── __init__.py     # Provider 工厂函数
+│   ├── db/                     # SQLite 存储层 (v0.4)
+│   │   ├── schema.sql          # DDL (4 张表 + 索引)
+│   │   ├── connection.py       # 连接管理器 (WAL 模式, 线程安全)
+│   │   └── queries.py          # CRUD + 聚合查询 (12 个函数)
 │   ├── core/
-│   │   ├── exceptions.py       # 自定义异常类
-│   │   ├── handlers.py         # 全局异常 → JSON 响应
+│   │   ├── exceptions.py       # 自定义异常类 (含 NotFoundError)
+│   │   ├── handlers.py         # 全局异常 → JSON 响应 (含 404)
 │   │   └── logging.py          # structlog 结构化日志
 │   ├── schemas/
-│   │   └── assess.py           # Pydantic 请求/响应模型
+│   │   ├── assess.py           # 评估请求/响应模型
+│   │   ├── agent.py            # Agent 对话/反馈请求模型
+│   │   └── history.py          # 历史/进度响应模型
 │   └── services/
-│       ├── phoneme_pipeline.py # 音素识别与评分核心逻辑
+│       ├── phoneme_pipeline.py # 核心: WhisperX → g2p-en → 对齐
 │       └── phoneme_map.py      # ARPAbet ↔ IPA 映射表
 └── tests/
     ├── conftest.py             # TestClient + sample_wav fixture
@@ -50,6 +69,9 @@ backend/
 | 文本转音素 | g2p-en 2.1 | CMUdict 字典，输出 ARPAbet |
 | 序列对齐 | 编辑距离 (Levenshtein) | 自定义 DP 实现，音素级对比 |
 | 音频转换 | ffmpeg | WebM/MP4 → WAV (16kHz/mono/16bit) |
+| 数据存储 | SQLite (WAL) | 评估记录、音素历史、Agent 反馈缓存 |
+| AI Agent | OpenAI-compatible API | 流式 SSE 对话 + 工具调用 (3 tools) |
+| Agent 工具 | Python async | query_phoneme_history, analyze_error_patterns, compare_progress |
 
 ## 快速开始
 
@@ -94,6 +116,11 @@ open http://localhost:8000/docs
 | `PORT` | `8000` | 监听端口 |
 | `LOG_LEVEL` | `info` | 日志级别 (debug/info/warning/error) |
 | `WHISPER_MODEL` | `medium.en` | Whisper 模型: `tiny.en` / `base.en` / `small.en` / `medium.en` |
+| `DB_PATH` | `data/pronuncy.db` | SQLite 数据库文件路径 |
+| `AGENT_PROVIDER` | `openai` | AI Agent Provider (openai-compatible) |
+| `AGENT_API_KEY` | — | Agent API 密钥 (OpenAI / DeepSeek / Qwen 等) |
+| `AGENT_MODEL` | `gpt-4o` | Agent 使用的模型名称 |
+| `AGENT_BASE_URL` | `https://api.openai.com/v1` | Agent API 接口地址 |
 
 ### 首次运行与模型选择
 
@@ -183,8 +210,118 @@ GET /health → 200 { "status": "ok" }
 | 状态码 | 说明 |
 |--------|------|
 | 400 | 参数校验失败（空文本、音频太小） |
+| 404 | 资源未找到（评估记录不存在） |
 | 422 | 音频解码失败（格式损坏、转码失败） |
 | 500 | 模型推理失败或内部错误 |
+
+### `GET /model`
+
+返回当前 Whisper 模型及可用选项。
+
+```
+GET /model → 200 {
+  "current": "medium.en",
+  "available": [
+    { "id": "tiny.en", "size": "~75MB", "accuracy": "Basic", ... },
+    ...
+  ]
+}
+```
+
+### `GET /history`
+
+按 session 列出最近评估记录。
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `session_id` | string (必填) | 客户端 Session ID |
+| `limit` | int (默认 20) | 返回条数 (1–100) |
+| `offset` | int (默认 0) | 分页偏移 |
+
+```
+GET /history?session_id=abc → 200 {
+  "items": [{ "id": "...", "target_text": "hello", "overall_score": 85.0, ... }],
+  "total": 1
+}
+```
+
+### `GET /history/{assessment_id}`
+
+返回单次评估的完整详情（包含 alignment、word_groups、accent_tips 等）。
+
+### `GET /history/progress`
+
+返回逐音素的学习进度统计数据。
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `session_id` | string (必填) | 客户端 Session ID |
+| `phoneme` | string (可选) | 筛选特定音素 (IPA) |
+
+```
+GET /history/progress?session_id=abc → 200 {
+  "phonemes": [
+    {
+      "phoneme": "θ",
+      "total_attempts": 12,
+      "correct_count": 4,
+      "average_acoustic": 0.62,
+      "average_overall": 72.5,
+      "last_practiced": "2026-06-07T...",
+      "recent_history": [...]
+    }
+  ]
+}
+```
+
+### `POST /agent/chat`
+
+自由对话式 AI 教练（SSE 流式响应）。Agent 会主动用 `/practice:` 格式邀请用户练习。
+
+**请求格式:** `application/json`
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `message` | string (必填) | 用户消息文本 |
+| `session_id` | string | Session ID |
+| `api_key` | string (必填) | API Key |
+| `base_url` | string (必填) | API 地址 |
+| `model` | string (必填) | 模型名称 |
+
+**响应:** `text/event-stream` (SSE)
+
+SSE 事件类型:
+| event | data | 说明 |
+|-------|------|------|
+| `thinking` | `{ "text": "..." }` | Agent 思考过程 |
+| `text` | `{ "text": "...", "section": null }` | 对话文本流 |
+| `done` | `{}` | 流结束 |
+
+### `POST /agent/feedback`
+
+针对已完成评估的 AI 分析（SSE 流式响应）。Agent 调用工具查询历史和模式，输出结构化反馈。
+
+**请求格式:** `application/json`
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `assessment_id` | string (必填) | 评估 ID |
+| `force` | bool (默认 false) | 跳过缓存重新生成 |
+| `api_key` | string | API Key（可选，默认用服务端配置） |
+| `base_url` | string | API 地址 |
+| `model` | string | 模型名称 |
+
+**响应:** `text/event-stream` (SSE)
+
+SSE 事件类型:
+| event | data | 说明 |
+|-------|------|------|
+| `thinking` | `{ "text": "..." }` | 分析思考过程 |
+| `tool_call` | `{ "id": "...", "name": "...", "arguments": {...} }` | 工具调用 |
+| `tool_result` | `{ "tool": "...", "result": {...} }` | 工具返回 |
+| `section` | `{ "section": "accent_tasks\|speaking_suggestions\|improvement_plan" }` | 反馈段落开始 |
+| `text` | `{ "text": "...", "section": "..." }` | 段落内容流 |
+| `done` | `{ "assessment_id": "...", "cached": bool }` | 流结束 |
 
 ## 开发指南
 
@@ -253,16 +390,67 @@ g2p-en → ARPAbet → IPA (目标音素序列)            │
 编辑距离对齐 → 逐音素对比                         │
     │                                            │
     ▼                                            │
-{ score, alignment, recognized_text, ... }      ─┘
+声学分析 → 口音知识库 → 个性化建议               │
+    │                                            │
+    ▼                                            │
+保存至 SQLite (assessments + alignment_items     │
+    + phoneme_history)                           │
+    │                                            │
+    ▼                                            │
+{ score, alignment[], acoustic[], tips[],        │
+  assessment_id, session_id }                   ─┘
+
+
+
+Agent 对话 (v0.4):
+
+浏览器 POST /agent/chat  ──────────────────────┐
+    │  { message, api_key, base_url, model }     │
+    ▼                                            │
+Agent Gateway (SSE streaming)                    │
+    │                                            │
+    ├─→ OpenAI-compatible API (stream)           │
+    │     └─→ AgentEvent (thinking/text/done)    │
+    │                                            │
+    └─→ SSE response → 浏览器实时渲染            │
+
+
+
+Agent 反馈 (v0.4):
+
+浏览器 POST /agent/feedback  ───────────────────┐
+    │  { assessment_id, ... }                    │
+    ▼                                            │
+Agent Gateway (SSE streaming + tool loop)        │
+    │                                            │
+    ├─→ SQLite: get_assessment()                 │
+    ├─→ OpenAI API (stream with tools)           │
+    │     ├─ tool_call → execute_tool()           │
+    │     │   ├─ query_phoneme_history → SQLite   │
+    │     │   ├─ analyze_error_patterns           │
+    │     │   └─ compare_progress → SQLite        │
+    │     └─ tool_result → back to LLM            │
+    │                                            │
+    ├─→ SQLite: cache_feedback()                 │
+    └─→ SSE response → 浏览器渲染结构化反馈      │
 ```
 
 ### 依赖注入
 
-`PhonemePipeline` 通过 FastAPI `Depends` 注入，每次请求创建新实例。模型在 `__init__` 中加载（WhisperX + wav2vec2 对齐模型），实际生产中可改用应用级单例减少加载开销。
+`PhonemePipeline` 通过 FastAPI `Depends` 注入，每次请求创建新实例。模型在 `__init__` 中加载（WhisperX + wav2vec2 对齐模型）。SQLite 连接在应用启动时（lifespan）初始化一次，全局共享。
+
+### Agent Provider 抽象
+
+`app/agent/providers/` 定义了 `AgentProvider` 抽象基类，支持任意 OpenAI-compatible API。通过 `.env` 配置 `AGENT_PROVIDER` / `AGENT_BASE_URL` 切换后端（OpenAI / DeepSeek / Qwen / 本地 Ollama 等）。
 
 ### 异常处理
 
-自定义异常统一继承 `PronuncyError`，全局 handler 根据异常类型返回对应状态码和 JSON 错误信息。未捕获异常统一返回 500。
+自定义异常统一继承 `PronuncyError`，全局 handler 根据异常类型返回对应状态码和 JSON 错误信息：
+- `ValidationError` → 400
+- `NotFoundError` → 404
+- `AudioDecodeError` → 422
+- 其他 `PronuncyError` → 500
+- 未捕获异常 → 500
 
 ### 音素映射
 
